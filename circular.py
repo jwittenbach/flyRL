@@ -1,3 +1,6 @@
+from numpy import arange, r_, asarray, zeros
+from scipy.interpolate import splev
+
 def circular_convolve(signal, ker):
     from numpy import convolve
     N_sig, N_ker = signal.shape[0], ker.shape[0]
@@ -51,3 +54,47 @@ def circular_vel(x, N_x, dx_max):
     from numpy import gradient
     unwound = unwind(x, N_x, dx_max)
     return gradient(unwound)
+
+
+class CircularSpline:
+
+    def __init__(self, k, n, domain=[0, 1], w=None):
+        self.k = k
+        self.n = n
+        self.domain = domain
+
+        if w is None:
+            w = zeros(n)
+        else:
+            w = asarray(w)
+            if w.shape[0] != n:
+                raise ValueError('number of weights must equal number of basis functions')
+
+        L = domain[1] - domain[0]
+        d = 1.0*L/ n
+
+        self.knots = d*arange(-k, n+k+1)
+        self.weights = self._expand_weights(w)
+
+    def set_weights(self, w):
+        self.weights = self._expand_weights(w)
+
+    def _expand_weights(self, w):
+        '''
+        expands weights to account for:
+        (a) circular boundary conditions
+        (b) boundary behavior of SciPy spline functions
+        '''
+        return r_[0, w, w[:self.k-1], 0]
+
+    @property
+    def w(self):
+        return self.weights[1:self.n+1]
+
+    def __call__(self, x):
+        return splev(x, (self.knots, self.weights, self.k-1), ext=1)
+
+    def eval_basis(self, i, x):
+        w = zeros(self.n)
+        w[i] = 1
+        return splev(x, (self.knots, self._expand_weights(w), self.k-1), ext=1)
