@@ -17,8 +17,7 @@ class DecisionModel(object):
         if self.params is None:
             raise ValueError('must initialize parameters')
 
-    @staticmethod
-    def _pNext(state, params):
+    def _pNext(self, state, params):
         '''
         Given the model parameters and the current state, returns the
         probability distribution over next states.
@@ -28,8 +27,7 @@ class DecisionModel(object):
         '''
         raise NotImplementedError
 
-    @classmethod
-    def _logL(cls, states, params):
+    def _logL(self, states, params):
         '''
         Given model parameters and a sequence of states, returns the
         log-likelihood of the model producing the data.
@@ -37,7 +35,7 @@ class DecisionModel(object):
         logL = 0
         for i in range(len(states) - 1):
             s1, s2 = states[i], states[i+1]
-            probNext = cls._pNext(s1, params)[s2]
+            probNext = self._pNext(s1, params)[s2]
             logL += np.log(probNext)
         return logL
 
@@ -74,20 +72,28 @@ class DecisionModel(object):
             states[i+1] = np.random.choice(self.nStates, p=p)
         return states
 
-    def fit(self, states, init, bounds=None, constraints=None):
+    def _fit(self, states, init, bounds=None, constraints=None):
         '''
         Fit models parameters given data consisiting of a sequence of states.
 
-        Subclasses will likely want to override this function in order to set
-        reasonable intial parameter guess, bounds, and constraints that make
-        sense for the given model. Then they can call this function with those
-        choices to perform the fit.
+        General function that allows for specification of initial values,
+        bounds, and constraints on parameters.
         '''
         from scipy.optimize import minimize
         f = lambda params, states: -self._logL(states, params)
         result = minimize(f, init, args=(states,), bounds=bounds,
                           constraints=constraints)
         return result
+
+    def fit(self, states):
+        '''
+        Fit model parameters given data consisting of a sequence of states.
+
+        Subclasses should override this method and use it to define reasonable
+        initial parameter estimates as well as any bounds or constraints on the
+        parameters. Those can then be passes to _fit for the actual fitting.
+        '''
+        raise NotImplementedError
 
 class TestModel(DecisionModel):
     '''
@@ -99,8 +105,7 @@ class TestModel(DecisionModel):
         params = p
         super(TestModel, self).__init__(nStates=len(p), nParams=len(p), params=params)
 
-    @staticmethod
-    def _pNext(state, params):
+    def _pNext(self, state, params):
         return params
 
     def fit(self, states):
@@ -109,4 +114,24 @@ class TestModel(DecisionModel):
         constraint = {'type': 'eq',
                       'fun': lambda params: np.sum(params) - 1}
         init = np.random.uniform(size=n)
-        return super(TestModel, self).fit(states, init, bounds, constraint)
+        return self._fit(states, init, bounds, constraint)
+
+class ValueModel(DecisionModel):
+    '''
+    Model of decisions based on a value function + a penalty for large steps
+    '''
+
+    def __init__(self, vSpline, nStates):
+        self.vSpline = vSpline
+        dom = vSpline.domain
+        self.locs = np.linspace(dom[0], dom[1], nStates+1)[:-1]
+        params = vSpline.w
+        super(ValueModel, self).__init__(nStates=nStates, nParams=len(params),
+                                         params=params)
+
+    def _pNext(self, state, params):
+        w = params[:]
+        self.vSpline.set_weights(w)
+        vals = self.vSpline(self.locs)
+        exp = np.exp(vals)
+        return exp/np.sum(exp)

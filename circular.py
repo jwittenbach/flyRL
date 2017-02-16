@@ -55,7 +55,6 @@ def circular_vel(x, N_x, dx_max):
     unwound = unwind(x, N_x, dx_max)
     return gradient(unwound)
 
-
 class CircularSpline:
 
     def __init__(self, k, n, domain=[0, 1], w=None):
