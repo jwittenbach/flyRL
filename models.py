@@ -142,10 +142,11 @@ class ValueModel(DecisionModel):
         # movement penalty: agent coordinates
         args = params[2:self.nargs+2]
         self.pFunc.args = args
+        self.pFunc.set_p_circ(self.locs[state])
         l = self.pFunc(self.locs)
 
         # objective function is input to softmax
         b1, b2 = params[0], params[1]
-        f = b1*v + b2*l
+        f = b1*v - b2*l
         exp = np.exp(f)
         return exp/np.sum(exp)
