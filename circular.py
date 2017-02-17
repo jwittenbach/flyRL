@@ -123,7 +123,7 @@ class CircularFun:
             len(x)
             y = asarray(x)
         except:
-            y = asarray([y])
+            y = asarray([x])
 
         # tranform input to circular domain (with left end shifted to 0)
         theta = (y - self.left) % self.L

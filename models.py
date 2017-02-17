@@ -121,17 +121,31 @@ class ValueModel(DecisionModel):
     Model of decisions based on a value function + a penalty for large steps
     '''
 
-    def __init__(self, vSpline, nStates):
+    def __init__(self, vSpline, pFunc, b1, b2, nStates):
         self.vSpline = vSpline
         dom = vSpline.domain
         self.locs = np.linspace(dom[0], dom[1], nStates+1)[:-1]
-        params = vSpline.w
+
+        self.pFunc = pFunc
+        self.nargs = len(pFunc.args)
+
+        params = np.r_[b1, b2, pFunc.args, vSpline.w]
         super(ValueModel, self).__init__(nStates=nStates, nParams=len(params),
                                          params=params)
 
     def _pNext(self, state, params):
-        w = params[:]
+        # value function: world coordiantes
+        w = params[self.nargs+2:]
         self.vSpline.set_weights(w)
-        vals = self.vSpline(self.locs)
-        exp = np.exp(vals)
+        v = self.vSpline(self.locs)
+
+        # movement penalty: agent coordinates
+        args = params[2:self.nargs+2]
+        self.pFunc.args = args
+        l = self.pFunc(self.locs)
+
+        # objective function is input to softmax
+        b1, b2 = params[0], params[1]
+        f = b1*v + b2*l
+        exp = np.exp(f)
         return exp/np.sum(exp)
