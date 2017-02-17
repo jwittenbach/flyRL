@@ -97,3 +97,44 @@ class CircularSpline:
         w = zeros(self.n)
         w[i] = 1
         return splev(x, (self.knots, self._expand_weights(w), self.k-1), ext=1)
+
+class CircularFun:
+    '''
+    Transforms a function on (-inf, inf) to a function on a circle
+    '''
+
+    def __init__(self, f, p_fun=0, p_circ=0, domain=[0, 1], args=[]):
+        left, right = domain[0], domain[1]
+        L = domain[1] - domain[0]
+
+        # compute where the discontinuity due to wrapping will occur 
+        split = (p_circ - left + L/2.0) % L + left
+
+        self.f = f
+        self.p_fun = p_fun
+        self.args = args
+        self.left = left
+        self.L = L
+        self.split = split
+
+    def __call__(self, x):
+        # coerece input to 1d numpy array
+        try:
+            len(x)
+            y = asarray(x)
+        except:
+            y = asarray([y])
+
+        # tranform input to circular domain (with left end shifted to 0)
+        theta = (y - self.left) % self.L
+
+        # shift so that the discontinuity is at the left (i.e. theta = 0)
+        # NB: this moves the pCirc to L/2
+        z = (theta -  self.split) % self.L
+
+        # compute function
+        return self.f(z - self.L/2.0 + self.p_fun, *self.args)
+
+    def set_p_circ(self, p_circ):
+        self.split = (p_circ - self.left + self.L/2.0) % self.L + self.left
+
