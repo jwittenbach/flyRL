@@ -30,6 +30,7 @@ def value_plot(data, model):
     plt.plot(x, v, c=sns.color_palette('dark')[2])
 
     # line plot of penalty function
+    model.pFunc.p_circ = 0.5
     p = model.pFunc(x)
     inds = np.where(p<m)
     plt.plot(x[inds], p[inds], c=sns.color_palette('dark')[3])
